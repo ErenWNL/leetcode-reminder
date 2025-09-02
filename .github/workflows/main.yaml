@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 env:
-  USERNAME: "leetcode-username"
+  USERNAME: "sriiii2003"
   LANGUAGE: "python"   #you can configure other lang like java , go , c, c++
   INCLUDE_CODE: "true" #False if you just want approach no explicit code
   WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} #please add a SLACK_WEBHOOK_URL in secrets
