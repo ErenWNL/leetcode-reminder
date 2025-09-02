@@ -1,0 +1,67 @@
+name: Send LeetCode Solution to slack with message
+
+
+on:
+  schedule:
+    
+    # Morning 9:00 AM IST
+    - cron: '30 3 * * *'
+    # Evening 9:00 PM IST
+    - cron: '30 15 * * *'
+  workflow_dispatch:
+
+env:
+  USERNAME: "leetcode-username"
+  LANGUAGE: "python"   #you can configure other lang like java , go , c, c++
+  INCLUDE_CODE: "true" #False if you just want approach no explicit code
+  WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} #please add a SLACK_WEBHOOK_URL in secrets
+
+jobs:
+  send-solution-to-slack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check user status
+        id: check
+        run: |
+          RESPONSE=$(curl -s "https://leetcode-reminder-ms-19a5a910d3d2.herokuapp.com/api/daily-question/check-user-status/$USERNAME")
+          echo "Raw Response: $RESPONSE"
+          solved=$(echo "$RESPONSE" | jq -r '.hasSolved')
+          echo "solved=$solved" >> $GITHUB_OUTPUT
+
+      - name: Get LeetCode solution
+        if: steps.check.outputs.solved == 'false'
+        id: get_solution
+        run: |
+          RESPONSE=$(curl -s "https://leetcode-reminder-ms-19a5a910d3d2.herokuapp.com/api/daily-question/ai-solution?language=$LANGUAGE&includeCode=$INCLUDE_CODE")
+
+          echo "$RESPONSE" | jq -r '.question' > question.txt
+          echo "$RESPONSE" | jq -r '.solution' > solution.txt
+
+      - name: Send Slack status message
+        run: |
+          if [ "${{ steps.check.outputs.solved }}" == "true" ]; then
+            STATUS="🎉 Great job, $USERNAME! You’ve already solved today’s LeetCode daily question. Keep up the streak! 🚀"
+          else
+            QUESTION=$(cat question.txt)
+            STATUS="⚡ Hey $USERNAME! You haven’t solved today’s LeetCode daily yet."
+          fi
+
+          PAYLOAD=$(jq -n --arg text "$STATUS" '{text: $text}')
+          curl -X POST -H 'Content-type: application/json' \
+            --data "$PAYLOAD" \
+            $WEBHOOK_URL
+
+      - name: Send Slack solution message
+        if: steps.check.outputs.solved == 'false'
+        run: |
+          QUESTION=$(cat question.txt)
+          SOLUTION=$(cat solution.txt)
+
+          # Build the message with proper formatting
+          TEXT="*Today's LeetCode Question - ${QUESTION}*"$'\n\n'"${SOLUTION}"
+
+          PAYLOAD=$(jq -n --arg text "$TEXT" '{text: $text}')
+
+          curl -X POST -H 'Content-type: application/json' \
+            --data "$PAYLOAD" \
+            $WEBHOOK_URL
